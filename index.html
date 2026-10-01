@@ -89,7 +89,7 @@
             opacity: 0.9;
         }
 
-        /* Widok A4 / Rysunek na ekranie */
+        /* Widok A4 na ekranie komputera */
         .preview-area {
             display: flex;
             justify-content: center;
@@ -101,7 +101,7 @@
 
         .page-a4 {
             width: 210mm;
-            min-height: 297mm;
+            height: 297mm;
             background: white;
             padding: 15mm;
             box-sizing: border-box;
@@ -130,8 +130,8 @@
         .svg-container {
             flex-grow: 1;
             width: 100%;
-            min-height: 400px;
             height: 100%;
+            min-height: 400px;
         }
 
         .footer-note {
@@ -145,103 +145,53 @@
             margin-top: auto;
         }
 
-        .footer-left {
-            font-weight: bold;
-            text-transform: uppercase;
-        }
+        .footer-left { font-weight: bold; text-transform: uppercase; }
+        .footer-center { color: #64748b; }
+        .footer-right { font-weight: bold; }
 
-        .footer-center {
-            color: #64748b;
-        }
-
-        .footer-right {
-            font-weight: bold;
-        }
-
-        /* RESPONSYWNOŚĆ EKRANOWA DLA SMARTFONÓW I TABLETÓW */
+        /* RESPONSYWNOŚĆ EKRANOWA (PODGLĄD TELEFONU) */
         @media (max-width: 900px) {
-            body {
-                padding: 10px;
-            }
-
-            .container {
-                grid-template-columns: 1fr;
-                gap: 15px;
-            }
-
-            .preview-area {
-                padding: 10px;
-            }
-
+            body { padding: 10px; }
+            .container { grid-template-columns: 1fr; gap: 15px; }
+            .preview-area { padding: 10px; }
             .page-a4 {
                 width: 100%;
-                min-height: auto;
+                height: auto;
                 aspect-ratio: 1 / 1.414;
-                padding: 10px;
+                padding: 12px;
             }
-
-            .header-title {
-                font-size: 15px;
-            }
-
-            .header-meta {
-                font-size: 10px;
-            }
-
-            .svg-container {
-                min-height: 350px;
-            }
-
-            .footer-note {
-                font-size: 8px;
-                flex-direction: column;
-                gap: 2px;
-                text-align: center;
-            }
+            .header-title { font-size: 14px; }
+            .header-meta { font-size: 9.5px; }
+            .footer-note { font-size: 8px; flex-direction: column; gap: 2px; text-align: center; }
         }
 
-        /* DEDYKOWANE STYLE DRUKU / PEŁNA STRONA A4 W PDF */
-        @page {
-            size: A4 portrait;
-            margin: 8mm;
-        }
-
+        /* HARD_PRINT OVERRIDE - DLA SYSTEMOWEGO SILNIKA DRUKU */
         @media print {
-            body {
-                background: white !important;
-                padding: 0 !important;
-                margin: 0 !important;
+            html, body {
                 width: 210mm !important;
                 height: 297mm !important;
-            }
-            .panel {
-                display: none !important;
-            }
-            .container {
-                display: block !important;
-                width: 100% !important;
-                max-width: 100% !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                background: white !important;
             }
-            .preview-area {
-                background: none !important;
-                padding: 0 !important;
-                display: block !important;
-            }
+            .panel { display: none !important; }
+            .container { display: block !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+            .preview-area { display: block !important; background: none !important; padding: 0 !important; margin: 0 !important; }
             .page-a4 {
                 box-shadow: none !important;
                 width: 210mm !important;
-                height: 275mm !important;
+                height: 277mm !important;
                 padding: 10mm !important;
                 box-sizing: border-box !important;
                 aspect-ratio: auto !important;
                 display: flex !important;
                 flex-direction: column !important;
+                page-break-after: avoid !important;
+                page-break-inside: avoid !important;
             }
             .svg-container {
                 width: 100% !important;
-                height: 180mm !important;
+                height: 200mm !important;
                 flex-grow: 1 !important;
             }
             .footer-note {
@@ -325,18 +275,18 @@
             <input type="text" id="job" value="Zlecenie #2026/09" oninput="draw()">
         </div>
 
-        <button onclick="draw(); setTimeout(() => { window.print(); }, 150);">🖨️ DRUKUJ / ZAPISZ PDF</button>
+        <button onclick="printPDF()">🖨️ DRUKUJ / ZAPISZ PDF</button>
     </div>
 
     <!-- ARKUSZ PODGLĄDU A4 -->
     <div class="preview-area">
-        <div class="page-a4">
+        <div class="page-a4" id="page-a4">
             <div class="header-drawing">
                 <div class="header-title" id="out-title">FRONT KUCHNIA #1</div>
                 <div class="header-meta" id="out-meta"></div>
             </div>
 
-            <div class="svg-container">
+            <div class="svg-container" id="svg-box">
                 <svg id="svg" width="100%" height="100%"></svg>
             </div>
 
@@ -356,7 +306,7 @@ function toggleFrame() {
     frameGroup.style.display = type === 'frame' ? 'block' : 'none';
 }
 
-function draw() {
+function draw(overrideWidth, overrideHeight) {
     const H = parseFloat(document.getElementById('h').value) || 0;
     const W = parseFloat(document.getElementById('w').value) || 0;
     const type = document.getElementById('type').value;
@@ -381,15 +331,13 @@ function draw() {
 
     if (H <= 0 || W <= 0) return;
 
-    // Pobranie pozycji puszek z formularza
     const dolne = ['d1', 'd2', 'd3'].map(id => parseFloat(document.getElementById(id).value)).filter(v => !isNaN(v));
     const gorne = ['g1', 'g2', 'g3'].map(id => parseFloat(document.getElementById(id).value)).filter(v => !isNaN(v));
 
-    // Skalowanie SVG
-    const svgW = svg.clientWidth || 300;
-    const svgH = svg.clientHeight || 400;
+    // Używamy nadpisanych wymiarów dla druku mobilnego lub aktualnego rozmiaru kontenera
+    const svgW = overrideWidth || svg.clientWidth || 700;
+    const svgH = overrideHeight || svg.clientHeight || 900;
     
-    // Zapasy miejsca na linie wymiarowe
     const maxOffset = Math.max(dolne.length, gorne.length) * 30 + 60;
     const paddingX = maxOffset + 50;
     const paddingY = 80;
@@ -401,7 +349,6 @@ function draw() {
     const startX = (svgW - boxW) / 2;
     const startY = (svgH - boxH) / 2;
 
-    // Definicja grotu strzałki wymiarowej
     let html = `
     <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -409,10 +356,8 @@ function draw() {
         </marker>
     </defs>`;
 
-    // Obrys zewnętrzny frontu
     html += `<rect x="${startX}" y="${startY}" width="${boxW}" height="${boxH}" fill="none" stroke="#000" stroke-width="2"/>`;
 
-    // Rysowanie wewnętrznej ramki (jeśli wybrano typ Ramka)
     if (type === 'frame') {
         const framePx = frameWidth * scale;
         if (boxW > framePx * 2 && boxH > framePx * 2) {
@@ -420,19 +365,14 @@ function draw() {
         }
     }
 
-    // Wyznaczenie osi X dla puszki od lewej lub prawej
     const isLeft = side === 'left';
     const axisX = isLeft ? startX + (axisOffset * scale) : startX + boxW - (axisOffset * scale);
     const edgeX = isLeft ? startX : startX + boxW;
 
-    // Linia osiowa puszki (pionowa dashed)
     html += `<line x1="${axisX}" y1="${startY - 20}" x2="${axisX}" y2="${startY + boxH + 20}" stroke="#94a3b8" stroke-dasharray="4,4" stroke-width="1"/>`;
-    
-    // Wymiar osi puszki od krawędzi na górze
     html += `<line x1="${edgeX}" y1="${startY - 12}" x2="${axisX}" y2="${startY - 12}" stroke="#000" stroke-width="1" marker-start="url(#arrow)" marker-end="url(#arrow)"/>`;
     html += `<text x="${(edgeX + axisX) / 2}" y="${startY - 16}" font-size="10" text-anchor="middle" font-weight="bold">${axisOffset}</text>`;
 
-    // Rysowanie samych puszek
     const r = (35 / 2) * scale;
     const puszkiY = [];
 
@@ -440,19 +380,13 @@ function draw() {
     gorne.forEach(g => puszkiY.push(startY + (g * scale)));
 
     puszkiY.forEach(cy => {
-        // Otwór puszki
         html += `<circle cx="${axisX}" cy="${cy}" r="${r}" fill="#f1f5f9" stroke="#000" stroke-width="1.5"/>`;
-        // Krzyżyk osiowy puszki
         html += `<line x1="${axisX - r - 3}" y1="${cy}" x2="${axisX + r + 3}" y2="${cy}" stroke="#000" stroke-width="0.8"/>`;
         html += `<line x1="${axisX}" y1="${cy - 8}" x2="${axisX}" y2="${cy + 8}" stroke="#000" stroke-width="0.8"/>`;
     });
 
-    // -------------------------------------------------------------
-    // OSOBNE LINIE WYMIAROWE DLA KAŻDEJ PUSZKI (SCHODKOWO)
-    // -------------------------------------------------------------
     const stepWidth = 30;
 
-    // 1. Wymiary OD DOŁU
     dolne.forEach((d, idx) => {
         const cy = startY + boxH - (d * scale);
         const yBottom = startY + boxH;
@@ -467,7 +401,6 @@ function draw() {
         html += `<text x="${lineX + (isLeft ? -6 : 6)}" y="${midY + 4}" font-size="11" font-weight="bold" text-anchor="${isLeft ? 'end' : 'start'}">${d}</text>`;
     });
 
-    // 2. Wymiary OD GÓRY
     gorne.forEach((g, idx) => {
         const cy = startY + (g * scale);
         const yTop = startY;
@@ -482,9 +415,6 @@ function draw() {
         html += `<text x="${lineX + (isLeft ? -6 : 6)}" y="${midY + 4}" font-size="11" font-weight="bold" text-anchor="${isLeft ? 'end' : 'start'}">${g}</text>`;
     });
 
-    // -------------------------------------------------------------
-    // WYMIARY GABARYTOWE (WYSOKOŚĆ I SZEROKOŚĆ)
-    // -------------------------------------------------------------
     const hDimX = isLeft ? startX + boxW + 40 : startX - 40;
     html += `<line x1="${isLeft ? startX + boxW : startX}" y1="${startY}" x2="${hDimX + (isLeft ? 8 : -8)}" y2="${startY}" stroke="#64748b" stroke-width="0.8"/>`;
     html += `<line x1="${isLeft ? startX + boxW : startX}" y1="${startY + boxH}" x2="${hDimX + (isLeft ? 8 : -8)}" y2="${startY + boxH}" stroke="#64748b" stroke-width="0.8"/>`;
@@ -500,11 +430,48 @@ function draw() {
     svg.innerHTML = html;
 }
 
+// DRUKOWANIE Z PRE-RENDEROWANIEM PEŁNEGO ROZMIARU A4 DLA TELEFONÓW
+function printPDF() {
+    const pageA4 = document.getElementById('page-a4');
+    const isMobile = window.innerWidth <= 900;
+
+    if (isMobile) {
+        // Tymczasowe przełączenie widoku na pełny wymiar A4 w pikselach
+        pageA4.style.width = '794px';
+        pageA4.style.height = '1123px';
+        pageA4.style.position = 'fixed';
+        pageA4.style.left = '0';
+        pageA4.style.top = '0';
+        pageA4.style.zIndex = '99999';
+        
+        draw(700, 950);
+
+        setTimeout(() => {
+            window.print();
+            setTimeout(() => {
+                // Przywrócenie widoku mobilnego po zamknięciu okna druku
+                pageA4.style.width = '';
+                pageA4.style.height = '';
+                pageA4.style.position = '';
+                pageA4.style.left = '';
+                pageA4.style.top = '';
+                pageA4.style.zIndex = '';
+                draw();
+            }, 500);
+        }, 200);
+    } else {
+        draw();
+        window.print();
+    }
+}
+
 window.onload = function() {
     toggleFrame();
     draw();
 };
-window.onresize = draw;
+window.onresize = function() {
+    draw();
+};
 </script>
 
 </body>
